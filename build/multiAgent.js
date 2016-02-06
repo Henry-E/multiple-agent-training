@@ -5,22 +5,24 @@ $(document).ready(function(){
 	    return toRound - toRound % 10;
 	}
 
-
-	//Canvas stuff
-	var canvas = $("#canvas")[0];
-	var ctx = canvas.getContext("2d");
-	ctx.canvas.width  = RoundDown(window.innerWidth * 0.85);
-  ctx.canvas.height = RoundDown(window.innerHeight * 0.85);
-	var w = $("#canvas").width();
-	var h = $("#canvas").height();
-
 	// cell width
-	var cw = 10;
+	var cw = 30;
 	var agents = [];
 	var food = [{x: 0, y:0}];
   // var food = [{x:4, y:0}, {x:3, y:1}, {x:2, y:2}, {x:1, y:1}, {x:0, y:0}, {x:1, y:3}, {x:0, y:4}, {x:3, y:3}, {x:4, y:4}];
 	var N = 5;
-	var num_agents = Math.round(w * h / 3300);
+	var num_agents = 2 //Math.round(w * h / 3300);
+
+
+	//Canvas stuff
+	var canvas = $("#canvas")[0];
+	var ctx = canvas.getContext("2d");
+	ctx.canvas.width  = cw * N //RoundDown(window.innerWidth * 0.85);
+  ctx.canvas.height = cw * N //RoundDown(window.innerHeight * 0.85);
+	var w = $("#canvas").width();
+	var h = $("#canvas").height();
+
+
 
 
 	// I haven't really implemented this bit yet, it would
@@ -54,6 +56,11 @@ $(document).ready(function(){
 		// http://martin.ankerl.com/2009/12/09/how-to-create-random-colors-programmatically/
 		this.colour = "rgba(" + colours[Math.floor(Math.random() * colours.length)] +", [[opacity]])";
 
+		this.attracted_to = [];
+		this.repulsed_by = [];
+
+
+
 		// actions the agent can take
 	    this.actions = [];
 	    this.actions.push("left");
@@ -62,7 +69,7 @@ $(document).ready(function(){
 	    this.actions.push("down");
 
 	    // neural network stuff
-	    var num_inputs = N * N * 2; // H X W number of cells. We're sticking with 5 X 5 since that's what it was trained on
+	    var num_inputs = N * N * 3; // H X W number of cells. We're sticking with 5 X 5 since that's what it was trained on
 		var num_actions = 4; // 4 possible directions the agent can turn
 		var temporal_window = 1; // amount of temporal memory
 		var network_size = num_inputs*temporal_window + num_actions*temporal_window + num_inputs;
@@ -112,7 +119,7 @@ $(document).ready(function(){
 	Agent.prototype = {
 		create_snake: function(){
 			// we're starting with length two to get it working
-			var length = Math.round(Math.random() * 6) + 3;
+			var length = 1//Math.round(Math.random() * 6) + 3;
 			// We're starting it in the middle but I'd prefer a random location
 	    var x_offset = Math.round(Math.random()*(w-cw)/cw);
 	    var y_offset = Math.round(Math.random()*(h-cw)/cw);
@@ -130,6 +137,22 @@ $(document).ready(function(){
 		},
 
 		update_board: function() {
+
+			// show where the agent is
+			this.paint_agent_cell()
+
+			// put together the input array, taking into account
+			// all the attraction and repulsion items
+			var input_array = this.get_input_array();
+
+			// this does the forward pass and updates the array location
+			this.move_agent(input_array);
+
+		},
+
+
+
+		paint_agent_cell: function(){
 	    for(var i = 0; i < this.agent_array.length; i++)
 	    {
 	    	var cell = this.agent_array[i];
@@ -138,44 +161,30 @@ $(document).ready(function(){
 	    	this.paint_cell(cell.x, cell.y, cell_colour);
 	    }
 
+		},
+
+		get_input_array: function(){
 			var input_array = [];
-			var head = this.agent_array[0];
-			var offset_head = [{
-				x: (head.x + this.x_subGrid_offset) % N,
-				y: (head.y + this.y_subGrid_offset) % N
-			}]
-			var current_subgrid_snake = this.get_current_subgrid(offset_head);
-			var current_subgrid_food = this.get_current_subgrid(food);
-			
 
-			for(var i = 0; i < current_subgrid_snake.length; i++)
+			// because we're using array.length to assign the item location
+			// these variables can be empty but must be initialised as an array
+			input_array = this.concatentate_input_array(input_array, this.agent_array);
+			input_array = this.concatentate_input_array(input_array, this.repulsed_by);
+			input_array = this.concatentate_input_array(input_array, this.attracted_to);
+
+			return input_array;
+		},
+
+		concatentate_input_array: function(input_array, board_item){
+
+			var current_subgrid = this.get_current_subgrid(board_item);
+
+			for(var i = 0; i < current_subgrid.length; i++)
 			{
-				input_array = input_array.concat(current_subgrid_snake[i]);
+				input_array = input_array.concat(current_subgrid[i]);
 			}
 
-				for(var i = 0; i < current_subgrid_food.length; i++)
-			{
-				input_array = input_array.concat(current_subgrid_food[i]);
-			}
-
-
-
-			this.forward(input_array);
-
-			// the x and y locations of the snake's head
-			var nx = this.agent_array[0].x;
-			var ny = this.agent_array[0].y;
-
-				// I'm not a fan of single letter variable names but
-				// this whole section becomes unreadable without them
-			       if(this.d == "right") nx = (nx + 1 == w/cw ? 0: nx + 1);
-		    else if(this.d == "left") nx = (nx - 1 == -1 ? w/cw-1: nx - 1);
-		    else if(this.d == "up") ny = (ny - 1 == -1 ? h/cw-1: ny - 1);
-		    else if(this.d == "down") ny = (ny + 1 == h/cw ? 0: ny + 1);
-
-		    var tail = this.agent_array.pop();
-		    tail.x = nx; tail.y = ny;
-		    this.agent_array.unshift(tail); // unshift makes the tail the first element in the array
+			return input_array;
 
 		},
 
@@ -202,6 +211,25 @@ $(document).ready(function(){
 	      }
 
 	      return array;
+		},
+
+		move_agent: function(input_array){
+			this.forward(input_array);
+
+			// the x and y locations of the snake's head
+			var nx = this.agent_array[0].x;
+			var ny = this.agent_array[0].y;
+
+			// I'm not a fan of single letter variable names but
+			// this whole section becomes unreadable without them
+		       if(this.d == "right") nx = (nx + 1 == w/cw ? 0: nx + 1);
+	    else if(this.d == "left") nx = (nx - 1 == -1 ? w/cw-1: nx - 1);
+	    else if(this.d == "up") ny = (ny - 1 == -1 ? h/cw-1: ny - 1);
+	    else if(this.d == "down") ny = (ny + 1 == h/cw ? 0: ny + 1);
+
+	    var tail = this.agent_array.pop();
+	    tail.x = nx; tail.y = ny;
+	    this.agent_array.unshift(tail); // unshift makes the tail the first element in the array
 		},
 
 		forward: function(input_array){
@@ -236,6 +264,13 @@ $(document).ready(function(){
 		{
 			agents.push(new Agent);
 		}
+
+		// this is a bit manually done at the moment
+		// assigning who's attracted to whom
+		agents[0].attracted_to = agents[1].agent_array;
+
+		agents[1].attracted_to = food;
+		agents[1].repulsed_by = agents[0].agent_array;
 
 		agents.sort(function(a, b){
 			return a.agent_array.length - b.agent_array.length;
