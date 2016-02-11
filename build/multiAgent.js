@@ -141,12 +141,8 @@ $(document).ready(function(){
 			// show where the agent is
 			this.paint_agent_cell()
 
-			// put together the input array, taking into account
-			// all the attraction and repulsion items
-			var input_array = this.get_input_array();
-
 			// this does the forward pass and updates the array location
-			this.move_agent(input_array);
+			this.move_agent();
 
 		},
 
@@ -161,6 +157,29 @@ $(document).ready(function(){
 	    	this.paint_cell(cell.x, cell.y, cell_colour);
 	    }
 
+		},
+
+		move_agent: function(){
+			// put together the input array, taking into account
+			// all the attraction and repulsion items
+			var input_array = this.get_input_array();
+
+			this.forward(input_array);
+
+			// the x and y locations of the snake's head
+			var nx = this.agent_array[0].x;
+			var ny = this.agent_array[0].y;
+
+			// I'm not a fan of single letter variable names but
+			// this whole section becomes unreadable without them
+		       if(this.d == "right") nx = (nx + 1 == w/cw ? 0: nx + 1);
+	    else if(this.d == "left") nx = (nx - 1 == -1 ? w/cw-1: nx - 1);
+	    else if(this.d == "up") ny = (ny - 1 == -1 ? h/cw-1: ny - 1);
+	    else if(this.d == "down") ny = (ny + 1 == h/cw ? 0: ny + 1);
+
+	    var tail = this.agent_array.pop();
+	    tail.x = nx; tail.y = ny;
+	    this.agent_array.unshift(tail); // unshift makes the tail the first element in the array
 		},
 
 		get_input_array: function(){
@@ -211,25 +230,6 @@ $(document).ready(function(){
 	      }
 
 	      return array;
-		},
-
-		move_agent: function(input_array){
-			this.forward(input_array);
-
-			// the x and y locations of the snake's head
-			var nx = this.agent_array[0].x;
-			var ny = this.agent_array[0].y;
-
-			// I'm not a fan of single letter variable names but
-			// this whole section becomes unreadable without them
-		       if(this.d == "right") nx = (nx + 1 == w/cw ? 0: nx + 1);
-	    else if(this.d == "left") nx = (nx - 1 == -1 ? w/cw-1: nx - 1);
-	    else if(this.d == "up") ny = (ny - 1 == -1 ? h/cw-1: ny - 1);
-	    else if(this.d == "down") ny = (ny + 1 == h/cw ? 0: ny + 1);
-
-	    var tail = this.agent_array.pop();
-	    tail.x = nx; tail.y = ny;
-	    this.agent_array.unshift(tail); // unshift makes the tail the first element in the array
 		},
 
 		forward: function(input_array){
